@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#05070a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="APEX DRIVE — 3D racing and open-world driving in your browser. Circuits, a full city, six sports cars, nitro and traffic.">
+<title>APEX DRIVE — 3D Racing</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0e13'/%3E%3Cpath d='M14 44 L32 18 L50 44 L40 44 L32 31 L24 44 Z' fill='%23ff5a1f'/%3E%3C/svg%3E">
+<style>/*__CSS__*/</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="gl"></canvas>
+  <div id="vignette"></div>
+  <div id="flash"></div>
+
+  <div id="hud">
+    <div class="hud-top">
+      <div class="hud-top__left">
+        <div class="chip"><small id="hud-lap-l">LAP</small><span id="hud-lap">1/3</span></div>
+        <div class="chip"><small>TIME</small><span id="hud-time">0:00.00</span></div>
+      </div>
+      <canvas id="minimap" width="208" height="208"></canvas>
+      <div class="hud-top__right">
+        <div class="chip"><small id="hud-pos-l">POS</small><span id="hud-pos">1/5</span></div>
+        <div class="chip chip--coin"><i class="coin"></i><span id="hud-coins">0</span></div>
+        <div class="hud-btns">
+          <button class="icon-btn" id="btn-cam" aria-label="Camera">◉</button>
+          <button class="icon-btn" id="btn-full" aria-label="Fullscreen">⛶</button>
+          <button class="icon-btn" id="btn-pause" aria-label="Pause">❚❚</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="speedo">
+      <svg viewBox="0 0 200 200">
+        <defs>
+          <linearGradient id="spdGrad" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0%" stop-color="#5fa8c7"/>
+            <stop offset="55%" stop-color="#ffc247"/>
+            <stop offset="100%" stop-color="#ff4d1c"/>
+          </linearGradient>
+        </defs>
+        <circle cx="100" cy="100" r="86" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="9"
+                stroke-dasharray="405.3 999" transform="rotate(135 100 100)" stroke-linecap="round"/>
+        <circle id="spd-arc" cx="100" cy="100" r="86" fill="none" stroke="url(#spdGrad)" stroke-width="9"
+                stroke-dasharray="0 999" transform="rotate(135 100 100)" stroke-linecap="round"/>
+        <g id="spd-ticks"></g>
+        <line id="spd-needle" x1="100" y1="46" x2="100" y2="24" stroke="#ff5a1f" stroke-width="4"
+              stroke-linecap="round" transform="rotate(135 100 100)"/>
+      </svg>
+      <div class="speedo__num" id="spd-num">0</div>
+      <div class="speedo__unit">KM / H</div>
+      <div class="speedo__gear" id="spd-gear">1</div>
+    </div>
+
+    <div class="nitro"><span class="nitro__label">NITRO</span><i id="nitro-fill"></i></div>
+
+    <div class="touch" id="touch">
+      <div class="touch__pad touch__pad--left">
+        <button class="tbtn" id="t-left" aria-label="Steer left">‹</button>
+        <button class="tbtn" id="t-right" aria-label="Steer right">›</button>
+      </div>
+      <div class="touch__pad touch__pad--right">
+        <div class="tbtn__row">
+          <button class="tbtn tbtn--nitro" id="t-nitro" aria-label="Nitro">NITRO</button>
+          <button class="tbtn tbtn--brake" id="t-brake" aria-label="Brake">BRAKE</button>
+        </div>
+        <button class="tbtn tbtn--gas" id="t-gas" aria-label="Accelerate">GAS</button>
+      </div>
+      <div class="wheel" id="wheel"><div class="wheel__ring"><span></span></div></div>
+    </div>
+
+    <div class="msg" id="msg"></div>
+    <div class="toast" id="toast"></div>
+    <div class="rotate-hint" id="rotate-hint">Rotate for the full cockpit view</div>
+  </div>
+
+  <div class="screen screen--center on" id="loading">
+    <div class="brand" style="gap:18px">
+      <div class="brand__mark">APEX</div>
+      <div class="brand__sub">drive</div>
+      <div class="loadbar" style="margin-top:18px"><i id="load-fill"></i></div>
+      <div class="loadtxt" id="load-txt">building circuits…</div>
+    </div>
+  </div>
+
+  <div class="screen" id="menu">
+    <div class="menu__top">
+      <div class="wallet"><i></i><span id="menu-coins">0</span></div>
+      <div class="menu__topright">
+        <div class="chip" style="background:rgba(10,14,19,.75);backdrop-filter:blur(8px)">
+          <small>BEST TOP SPEED</small><span id="menu-topspeed">0</span>
+        </div>
+        <button class="icon-btn" id="m-full" aria-label="Fullscreen">⛶</button>
+      </div>
+    </div>
+    <div class="menu__mid">
+      <div class="brand">
+        <div class="brand__mark">APEX</div>
+        <div class="brand__sub">drive · 3d racing</div>
+      </div>
+      <div class="menu__nav">
+        <button class="btn btn--primary btn--wide" id="m-race">Race <span class="btn__hint" id="m-race-hint">3 LAPS</span></button>
+        <div class="menu__row">
+          <button class="btn" id="m-free">Free Ride</button>
+          <button class="btn" id="m-garage">Garage</button>
+        </div>
+        <div class="menu__row">
+          <button class="btn btn--ghost" id="m-tracks">Maps</button>
+          <button class="btn btn--ghost" id="m-settings">Settings</button>
+        </div>
+        <button class="btn btn--ghost btn--wide" id="m-controls">Controls</button>
+      </div>
+    </div>
+    <div class="menu__foot">
+      <span id="menu-car">Falcon GT</span>
+      <span id="menu-track">Costa Verde</span>
+    </div>
+  </div>
+
+  <div class="screen" id="tracks">
+    <div class="panel-head">
+      <button class="icon-btn" data-back="menu">‹</button>
+      <h2>Maps</h2>
+      <div class="spacer"></div>
+      <span class="tiny" id="tracks-mode">Race · 2 laps</span>
+    </div>
+    <div class="track-list" id="track-list"></div>
+    <button class="btn btn--primary btn--wide" id="btn-launch">Start engine</button>
+  </div>
+
+  <div class="screen" id="garage">
+    <div class="panel-head">
+      <button class="icon-btn" data-back="menu">‹</button>
+      <h2>Garage</h2>
+      <div class="spacer"></div>
+      <div class="wallet" style="padding:5px 11px"><i></i><span id="garage-coins">0</span></div>
+    </div>
+    <div class="garage__body">
+      <div class="garage__stage">
+        <div class="stagehint">drag to rotate · live 3D</div>
+      </div>
+      <div class="garage__side">
+        <div class="car-title">
+          <h3 id="car-name">Falcon GT</h3>
+          <small id="car-cls">Sports</small>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div class="stat"><span>Speed</span><div class="bar"><i id="st-speed" style="width:50%"></i></div><b id="st-speed-v">50</b></div>
+          <div class="stat"><span>Accel</span><div class="bar"><i id="st-accel" style="width:50%"></i></div><b id="st-accel-v">50</b></div>
+          <div class="stat"><span>Grip</span><div class="bar"><i id="st-grip" style="width:50%"></i></div><b id="st-grip-v">50</b></div>
+          <div class="stat"><span>Nitro</span><div class="bar"><i id="st-nitro" style="width:50%"></i></div><b id="st-nitro-v">50</b></div>
+        </div>
+        <p class="tiny" id="car-blurb" style="margin:0;line-height:1.5;text-transform:none;letter-spacing:.04em;font-size:10.5px;color:var(--dim)"></p>
+        <button class="btn btn--primary btn--wide" id="btn-car">Select</button>
+        <div class="car-strip" id="car-strip"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="controls">
+    <div class="panel-head">
+      <button class="icon-btn" data-back="menu">‹</button>
+      <h2>Controls</h2>
+      <div class="spacer"></div>
+      <button class="btn btn--sm" id="ctl-reset">Defaults</button>
+    </div>
+    <div class="ctl-body">
+      <div class="ctl-group">
+        <div class="ctl-label">Steering</div>
+        <div class="seg seg--big" id="seg-scheme">
+          <button data-scheme="buttons">Buttons</button>
+          <button data-scheme="wheel">Wheel</button>
+          <button data-scheme="tilt">Tilt</button>
+        </div>
+        <div class="ctl-hint" id="scheme-hint">Two arrows. Most reliable on any phone.</div>
+      </div>
+      <div class="ctl-group">
+        <div class="ctl-label">Throttle side</div>
+        <div class="seg seg--big" id="seg-hand">
+          <button data-hand="right">Right</button>
+          <button data-hand="left">Left</button>
+        </div>
+      </div>
+      <div class="ctl-group">
+        <div class="ctl-label">Button size</div>
+        <div class="seg seg--big" id="seg-size">
+          <button data-size="0.85">Small</button>
+          <button data-size="1">Medium</button>
+          <button data-size="1.2">Large</button>
+        </div>
+      </div>
+      <div class="ctl-group">
+        <div class="ctl-label">Steering sensitivity <b id="sens-val">1.0×</b></div>
+        <input type="range" id="sens" min="0.5" max="1.8" step="0.05" value="1">
+      </div>
+      <div class="ctl-group">
+        <div class="ctl-label">Auto throttle <small>gas is always on — one thumb play</small></div>
+        <div class="seg seg--big" id="seg-auto"><button data-a="0">Off</button><button data-a="1">On</button></div>
+      </div>
+      <div class="ctl-group">
+        <div class="ctl-label">Nitro button</div>
+        <div class="seg seg--big" id="seg-nitro"><button data-n="0">Hide</button><button data-n="1">Show</button></div>
+      </div>
+      <div class="ctl-group">
+        <div class="ctl-label">Button opacity</div>
+        <div class="seg seg--big" id="seg-opacity">
+          <button data-op="0.55">Faint</button>
+          <button data-op="0.8">Normal</button>
+          <button data-op="1">Solid</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen screen--center screen--veil" id="settings">
+    <div class="settings-list">
+      <div class="panel-head" style="margin-bottom:4px">
+        <button class="icon-btn" data-back="menu">‹</button>
+        <h2>Settings</h2>
+      </div>
+      <div class="setting">
+        <div><label>Graphics</label><small>detail & shadows</small></div>
+        <div class="seg" id="seg-quality">
+          <button data-q="0">Low</button><button data-q="1">Med</button><button data-q="2">High</button>
+        </div>
+      </div>
+      <div class="setting">
+        <div><label>Driving feel</label><small>speed & grip</small></div>
+        <div class="seg" id="seg-handling">
+          <button data-h="easy">Easy</button><button data-h="normal">Normal</button><button data-h="pro">Pro</button>
+        </div>
+      </div>
+      <div class="setting">
+        <div><label>Sound</label><small>engine, tyres, nitro</small></div>
+        <div class="seg" id="seg-sound"><button data-s="1">On</button><button data-s="0">Off</button></div>
+      </div>
+      <div class="setting">
+        <div><label>Reset progress</label><small>coins, cars, records</small></div>
+        <button class="btn btn--sm" id="btn-reset">Reset</button>
+      </div>
+      <p class="tiny" style="text-align:center;margin:6px 0 0;text-transform:none;letter-spacing:.04em;line-height:1.6">
+        APEX DRIVE · procedural 3D · runs entirely in your browser<br>Built on three.js (MIT) · fonts Chakra Petch &amp; JetBrains Mono (OFL)
+      </p>
+    </div>
+  </div>
+
+  <div class="screen screen--center screen--veil" id="pause">
+    <div class="pause-list">
+      <div class="brand" style="margin-bottom:10px">
+        <div class="brand__mark" style="font-size:34px">PAUSED</div>
+      </div>
+      <button class="btn btn--primary" id="p-resume">Resume</button>
+      <button class="btn" id="p-restart">Restart</button>
+      <button class="btn" id="p-controls">Controls</button>
+      <button class="btn" id="p-cam">Camera</button>
+      <button class="btn btn--ghost" id="p-quit">Quit to menu</button>
+    </div>
+  </div>
+
+  <div class="screen screen--center screen--veil" id="results">
+    <div class="result-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <h2 id="res-title">Race complete</h2>
+          <div class="tiny" id="res-sub">Costa Verde</div>
+        </div>
+        <div class="stars" id="res-stars">☆☆☆</div>
+      </div>
+      <div class="result-grid">
+        <div class="result-cell"><small id="res-l1">Total time</small><b id="res-time">0:00.00</b></div>
+        <div class="result-cell"><small id="res-l2">Best lap</small><b id="res-bestlap">0:00.00</b></div>
+        <div class="result-cell"><small id="res-l3">Position</small><b id="res-pos">1 / 5</b></div>
+        <div class="result-cell"><small id="res-l4">Top speed</small><b id="res-speed">0</b></div>
+        <div class="result-cell"><small id="res-l5">Coins collected</small><b id="res-coins">0</b></div>
+        <div class="result-cell"><small id="res-l6">Drift time</small><b id="res-drift">0s</b></div>
+      </div>
+      <div class="result-reward">
+        <span class="tiny">Reward</span>
+        <b id="res-reward">+0</b>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="res-retry" style="flex:1">Retry</button>
+        <button class="btn btn--primary" id="res-menu" style="flex:1.2">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="perf"></div>
+</div>
+<script>/*__THREE__*/</script>
+<script>/*__JS__*/</script>
+</body>
+</html>
